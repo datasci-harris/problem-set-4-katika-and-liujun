@@ -94,9 +94,25 @@ df_pos2018 = read_short_term_hospitals(2018, pset_path)
 df_pos2019 = read_short_term_hospitals(2019, pset_path)
 
 # append all the pos data
-df_pos2017_to_2019 = pd.concat([df_pos2017, df_pos2018, df_pos2019], ignore_index=True)
+df_pos2017_to_2019 = pd.concat([df_pos2016.assign(year = 2016), df_pos2017.assign(year = 2017), df_pos2018.assign(year = 2018), df_pos2019.assign(year = 2019)], ignore_index=True)
 
 ```
+
+```{python}
+# plot number of observations by year
+observation_by_year= df_pos2017_to_2019.groupby('year').size().reset_index(name='count')
+
+observation_by_year_plot = alt.Chart(observation_by_year).mark_bar(
+    ).encode(
+        alt.Y('year:O', title='Year'),
+        alt.X('count:Q', title='Number of Observations'),
+    ).properties(
+        title='Number of observations im Provide-of-Service file between 2017 to 2019',
+    )
+observation_by_year_plot 
+```
+```
+
 
 4. 
     a.
