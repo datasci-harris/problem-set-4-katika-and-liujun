@@ -23,13 +23,81 @@ include-before-body:
 
 ## Submission Steps (10 pts)
 
+
+
+
+
+
+```{python}
+import pandas as pd
+import altair as alt
+import time
+
+import warnings 
+warnings.filterwarnings('ignore')
+alt.renderers.enable("png")
+```
 ## Download and explore the Provider of Services (POS) file (10 pts)
 
 1. 
+```
+PRVDR_CTGRY_SBTYP_CD = Sub-type of Provider
+PRVDR_CTGRY_CD = Provider Category Code
+PRVDR_NUM = CMS Certification Number
+PGM_TRMNTN_CD = Termination Code
+TRMNTN_EXPRTN_DT = Date the provider was terminated 
+FAC_NAME = Facility Name
+ZIP_CD = Zip code
+STATE_CD = State Abbreviation
+```
 2. 
-    a.
+
+```{python}
+# set path and read in the pos2016.csv file
+pset_path = '/Users/katikaklinkaew/Documents/GitHub/problem-set-4-katika-and-liujun/data/'
+
+# create a function to load, filter, and count number of short-term hospitals
+def read_short_term_hospitals(year, pset_path):
+    """
+    read the provider-of-service data for a given year, filters for short-term hospitals,
+    and returns the filtered DataFrame.
+    
+    Parameters:
+        year (int): The year of the data (e.g., 2017).
+        pset_path (str): The path to the directory containing the CSV files.
+
+    """
+    file_path = os.path.join(pset_path, f'pos{year}.csv')
+    df = pd.read_csv(file_path, encoding='latin1')
+    df = df[(df['PRVDR_CTGRY_CD'] == 1) & (df['PRVDR_CTGRY_SBTYP_CD'] == 1)]
+    print(f'There are {df.shape[0]} short-term hospitals reported in {year} data')
+    return df
+
+```
+
+
+
+    a. 
+```{python}
+df_pos2016 = read_short_term_hospitals(2016, pset_path)
+```
+Does it make sense?
     b.
+
+   
 3. 
+
+```{python}
+# repeat the steps for each year
+df_pos2017 = read_short_term_hospitals(2017, pset_path)
+df_pos2018 = read_short_term_hospitals(2018, pset_path)
+df_pos2019 = read_short_term_hospitals(2019, pset_path)
+
+# append all the pos data
+df_pos2017_to_2019 = pd.concat([df_pos2017, df_pos2018, df_pos2019], ignore_index=True)
+
+```
+
 4. 
     a.
     b.
