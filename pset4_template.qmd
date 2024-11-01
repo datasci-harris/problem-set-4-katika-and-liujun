@@ -229,9 +229,9 @@ counts_2017_2018 = active_counts[active_counts['year'].isin([2017, 2018])]
 counts_2017_2018 = counts_2017_2018.pivot(index='ZIP_CD', columns='year', values='active_count').reset_index()
 
 # filter for ZIP codes in closed_zip_2017 with less count in 2017 than 2018
-same_count_zip_2017 = counts_2017_2018[(counts_2017_2018['ZIP_CD'].isin(closed_zip_2017)) & (counts_2017_2018[2017] < counts_2017_2018[2018])]
+count_zip_2017 = counts_2017_2018[(counts_2017_2018['ZIP_CD'].isin(closed_zip_2017)) & (counts_2017_2018[2017] <= counts_2017_2018[2018])]
 
-same_count_zip_2017
+count_zip_2017
 ```
 
 ```{python}
@@ -244,23 +244,23 @@ counts_2018_2019 = active_counts[active_counts['year'].isin([2018, 2019])]
 counts_2018_2019 = counts_2018_2019 .pivot(index='ZIP_CD', columns='year', values='active_count').reset_index()
 
 # filter for ZIP codes in closed_zip_2017 with less count in 2017 than 2018
-same_count_zip_2018 = counts_2018_2019[(counts_2018_2019['ZIP_CD'].isin(closed_zip_2018)) & (counts_2018_2019 [2018] < counts_2018_2019[2019])]
+count_zip_2018 = counts_2018_2019[(counts_2018_2019['ZIP_CD'].isin(closed_zip_2018)) & (counts_2018_2019 [2018] <= counts_2018_2019[2019])]
 
-same_count_zip_2018
+count_zip_2018
 
-same_count_zip = combined_df = pd.concat([same_count_zip_2017, same_count_zip_2018], ignore_index=True)
+count_zip = pd.concat([count_zip_2017, count_zip_2018], ignore_index=True)
 ```
 
     a. How many hospitals fit this definition of potentially being a merger/acquisition?
 ```{python}
 
-print(f"{same_count_zip.shape[0]} hospitals fit this definition of potentially being a merger/acquisition.")
+print(f"{count_zip.shape[0]} hospitals fit this definition of potentially being a merger/acquisition.")
 ```
 
     b. After correcting for this, how many hospitals do you have left?
 ```{python}
 # filter merger hospitials
-closed_hospitals = closed_hospitals[~closed_hospitals['ZIP_CD'].isin(same_count_zip['ZIP_CD'])]
+closed_hospitals = closed_hospitals[~closed_hospitals['ZIP_CD'].isin(count_zip['ZIP_CD'])]
 
 print(f"{closed_hospitals.shape[0]} hospitals were active in 2016 that were suspected to have closed by 2019")
 ```
@@ -278,14 +278,111 @@ closed_hospitals.sort_values('FAC_NAME')[['FAC_NAME','Termination_Year']].head(1
     b. 
 2. 
 
+```{python}
+import geopandas as gpd
+
+filepath = "/Users/aa/Documents/Q4/Python/shp"
+zip_shp = gpd.read_file(filepath)
+```
+
+```{python}
+# Texas zip codes start with 733, and 750 - 799
+zip_tx = zip_shp[zip_shp['NAME'].str.startswith(('733', '75', '76', '77', '78', '79'))]
+```
+
 ## Calculate zip code’s distance to the nearest hospital (20 pts) (*)
 
 1. 
+```{python}
+#  Create a GeoDataFrame for the centroid of each zip code nationally
+
+zips_all_centroids = gpd.GeoDataFrame({
+    'ZIP_CD': zip_shp['NAME'],
+    'centroid': zip_shp.geometry.centroid
+})
+
+
+zips_all_centroids.shape
+```
+
+The dimensions of the GeoDataFrame include 33120 rows and 2 columns. The first column 'ZIP_CD' is the zip codes nationally and the second column 'centroid' is the position of all the points in the zip code polygons.
+
 2. 
-3. 
+```{python}
+# Texas zip codes start with 733, and 750 - 799
+zips_texas_centroids = zips_all_centroids[zips_all_centroids['ZIP_CD'].str.startswith(('733', '75', '76', '77', '78', '79'))]
+
+# the border states include NM, OK, AR, LA
+# zip codes start with 700 - 749, 870 - 884
+
+zips_texas_borderstates_centroids = zips_all_centroids[zips_all_centroids['ZIP_CD'].str.startswith(('7', '87', '88'))]
+
+print(f"Unique zip codes in zip_texas_centroids: {zips_texas_centroids['ZIP_CD'].nunique()}")
+print(f"Unique zip codes in zips_texas_borderstates_centroids: {zips_texas_borderstates_centroids['ZIP_CD'].nunique()}")
+```
+
+
+3. Create a subset of zips_texas_borderstates_centroids that contains only the zip codes with at least 1 hospital in 2016
+
+I will do a inner merge on variables merging on ZIP_CD.
+```{python}
+zip_2016 = pd.DataFrame(df_pos2016['ZIP_CD'].fillna(0).astype(int).astype(str).str.zfill(5).drop_duplicates())
+zip_2016.columns = ['ZIP_CD']
+zips_texas_borderstates_centroids['ZIP_CD'] = zips_texas_borderstates_centroids['ZIP_CD'].astype(str)
+
+zips_withhospital_centroids = zips_texas_borderstates_centroids.merge(zip_2016, on = 'ZIP_CD')
+```
+
+```{python}
+zips_withhospital_centroids.head()
+```
+
 4. 
-    a.
-    b.
+    a. Try the join with 10 zip codes
+
+```{python}
+import time
+
+zips_texas_centroids = zips_texas_centroids.set_geometry('centroid')
+zips_withhospital_centroids = zips_withhospital_centroids.set_geometry('centroid')
+
+start_time = time.time()
+
+join_first_10 = gpd.sjoin_nearest(
+    zips_texas_centroids[:10],  #left df
+    zips_withhospital_centroids, #right df
+    how='left', 
+    distance_col="distance"
+)
+
+end_time = time.time()
+
+print(f"Runtime: {end_time - start_time}")
+
+```
+
+It takes around 0.03 seconds to join the 10 zip codes. As there are 1935 unique zip codes in zip_texas_centroids, the total would be 0.03*1935/10 = 5.805 seconds. In other words, we estimate the entire procedure will take around 5 - 6 seconds.
+
+
+    b. Doing the full join
+
+```{python}
+
+start_time = time.time()
+
+join_all = gpd.sjoin_nearest(
+    zips_texas_centroids,  #left df
+    zips_withhospital_centroids, #right df
+    how='left', 
+    distance_col="distance"
+)
+
+end_time = time.time()
+
+print(f"Runtime: {end_time - start_time}")
+
+```
+
     c.
 5. 
     a.
