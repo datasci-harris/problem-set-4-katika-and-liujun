@@ -54,7 +54,7 @@ STATE_CD = State Abbreviation
 
 ```{python}
 # set path and read in the pos2016.csv file
-pset_path = '/Users/katikaklinkaew/Documents/GitHub/problem-set-4-katika-and-liujun/data/'
+pset_path = '/Users/aa/Documents/GitHub/problem-set-4-katika-and-liujun/data/'
 
 # create a function to load, filter, and count number of short-term hospitals
 def read_short_term_hospitals(year, pset_path):
@@ -80,14 +80,7 @@ def read_short_term_hospitals(year, pset_path):
     a. 
 ```{python}
 df_pos2016 = read_short_term_hospitals(2016, pset_path)
-```
-Does it make sense?
-    b.
 
-   
-3. 
-
-```{python}
 # repeat the steps for each year
 df_pos2017 = read_short_term_hospitals(2017, pset_path)
 df_pos2018 = read_short_term_hospitals(2018, pset_path)
@@ -110,7 +103,7 @@ observation_by_year_plot = alt.Chart(observation_by_year).mark_bar(
         title='Number of observations im Provide-of-Service file between 2017 to 2019',
     )
 observation_by_year_plot 
-```
+
 ```
 
 
@@ -120,12 +113,163 @@ observation_by_year_plot
 
 ## Identify hospital closures in POS file (15 pts) (*)
 
-1. 
-2. 
-3. 
-    a.
-    b.
-    c.
+1. Create a list of all hospitals that were active in 2016 that were suspected to have closed by 2019
+
+```{python}
+df = df_pos2017_to_2019.copy()
+
+# initialize a dictionary to store termination years
+termination_years = {}
+
+# extract the active hospitals in 2016
+active_2016 = df[(df['year'] == 2016) & (df['PGM_TRMNTN_CD'] == 0)]
+
+active_df = df[df['FAC_NAME'].isin(active_2016['FAC_NAME'])]
+
+# group data by hospital name
+for hospital, group in active_df.groupby('FAC_NAME'):
+    # sort records by year for this hospital
+    group = group.sort_values('year')
+    
+    # set a default termination year as None
+    termination_year = None
+    
+    # check each year from 2017 to 2019 for termination
+    for year in [2017, 2018, 2019]:
+        # filter the data for the current year
+        yearly_data = group[group['year'] == year]
+        
+        # if no record for the hospital in this year, mark as terminated
+        if yearly_data.empty:
+            termination_year = year
+            break
+        # if the hospital is present but not active, mark as terminated
+        elif yearly_data['PGM_TRMNTN_CD'].values[0] != 0:
+            termination_year = year
+            break
+
+    # if a termination year was identified, store it in the dictionary
+    if termination_year:
+        termination_years[hospital] = termination_year
+
+# convert the termination years to a DataFrame
+terminate_year_df = pd.DataFrame(list(termination_years.items()), columns=['FAC_NAME', 'Termination_Year'])
+
+# adding ZIP code information for each hospital from original dataset
+closed_hospitals_zipcode = active_df[active_df['year'] == 2016][['FAC_NAME', 'ZIP_CD']].drop_duplicates('FAC_NAME')
+
+# combine termination years with ZIP code information
+closed_hospitals = terminate_year_df.merge(closed_hospitals_zipcode, on='FAC_NAME', how='left')
+```
+
+
+```{python}
+""" df = df_pos2017_to_2019.copy()
+
+# extract the active hospitals in 2016
+active_2016 = df[(df['year'] == 2016) & (df['PGM_TRMNTN_CD'] == 0)]
+
+# extract the active hospitals till 2019
+active_2019_hospitals = []
+
+for hospital, group in df.groupby('FAC_NAME'):
+    # check if the hospital is active from 2016 to 2019
+    if all(((group['year'] == year) & (group['PGM_TRMNTN_CD'] == 0)).any() for year in [2016, 2017, 2018, 2019]):
+        active_2019_hospitals.append(hospital)
+
+# closed hospital name
+closed_hospitals_name = set(active_2016['FAC_NAME']) - set(active_2019_hospitals)
+
+closed_hospitals_all_year = df[df['FAC_NAME'].isin(closed_hospitals_name)]
+
+# Define the function to determine the termination year for a hospital
+def get_termination_year(subdf):
+    # If there is a termination code other than 0, return the earliest year
+    if not subdf[subdf['PGM_TRMNTN_CD'] != 0].empty:
+        return subdf[subdf['PGM_TRMNTN_CD'] != 0]['year'].min()
+    else:
+        # Otherwise, assume the hospital was active until the last year + 1
+        return subdf['year'].max() + 1
+
+# apply the function to each hospital group and convert to a dictionary
+terminate_year = closed_hospitals_all_year.groupby('FAC_NAME').apply(get_termination_year).to_dict()
+
+terminate_year = pd.DataFrame(list(terminate_year.items()), columns=['FAC_NAME', 'Termination_Year'])
+
+# add zipcode
+closed_hospitals_zipcode = active_2016[active_2016['FAC_NAME'].isin(closed_hospitals_name)][['FAC_NAME', 'ZIP_CD']]
+
+# combine the two dataframe
+
+closed_hospitals = terminate_year.merge(closed_hospitals_zipcode)
+
+closed_hospitals = closed_hospitals.drop_duplicates('FAC_NAME') """
+```
+
+```{python}
+print(f"{closed_hospitals.shape[0]} hospitals were active in 2016 that were suspected to have closed by 2019")
+```
+
+2. Sort this list of hospitals by name and report the names and year of suspected closure for the first 10 rows
+```{python}
+closed_hospitals.sort_values('FAC_NAME')[['FAC_NAME','Termination_Year']].head(10)
+```
+
+3. Remove any suspected hospital closures that are in zip codes where the number of active hospitals does not decrease in the year after the suspected closure
+    
+```{python}
+# extract all the zip codes of terminated hospitals in 2017 and check if the number decreased in 2018
+
+closed_zip_2017 = closed_hospitals[closed_hospitals['Termination_Year'] == 2017]['ZIP_CD']
+
+active_counts = df.groupby(['year', 'ZIP_CD'])['PGM_TRMNTN_CD'].apply(lambda x: (x == 0).sum()).reset_index(name='active_count')
+
+# filter for 2017 and 2018 only
+counts_2017_2018 = active_counts[active_counts['year'].isin([2017, 2018])]
+counts_2017_2018 = counts_2017_2018.pivot(index='ZIP_CD', columns='year', values='active_count').reset_index()
+
+# filter for ZIP codes in closed_zip_2017 with less count in 2017 than 2018
+same_count_zip_2017 = counts_2017_2018[(counts_2017_2018['ZIP_CD'].isin(closed_zip_2017)) & (counts_2017_2018[2017] < counts_2017_2018[2018])]
+
+same_count_zip_2017
+```
+
+```{python}
+# repeat the step for 2018 and 2019
+
+closed_zip_2018 = closed_hospitals[closed_hospitals['Termination_Year'] == 2018]['ZIP_CD']
+
+# filter for 2018 and 2019 only
+counts_2018_2019 = active_counts[active_counts['year'].isin([2018, 2019])]
+counts_2018_2019 = counts_2018_2019 .pivot(index='ZIP_CD', columns='year', values='active_count').reset_index()
+
+# filter for ZIP codes in closed_zip_2017 with less count in 2017 than 2018
+same_count_zip_2018 = counts_2018_2019[(counts_2018_2019['ZIP_CD'].isin(closed_zip_2018)) & (counts_2018_2019 [2018] < counts_2018_2019[2019])]
+
+same_count_zip_2018
+
+same_count_zip = combined_df = pd.concat([same_count_zip_2017, same_count_zip_2018], ignore_index=True)
+```
+
+    a. How many hospitals fit this definition of potentially being a merger/acquisition?
+```{python}
+
+print(f"{same_count_zip.shape[0]} hospitals fit this definition of potentially being a merger/acquisition.")
+```
+
+    b. After correcting for this, how many hospitals do you have left?
+```{python}
+# filter merger hospitials
+closed_hospitals = closed_hospitals[~closed_hospitals['ZIP_CD'].isin(same_count_zip['ZIP_CD'])]
+
+print(f"{closed_hospitals.shape[0]} hospitals were active in 2016 that were suspected to have closed by 2019")
+```
+
+    c. Sort this list of corrected hospital closures by name and report the first 10 rows.
+
+```{python}
+closed_hospitals.sort_values('FAC_NAME')[['FAC_NAME','Termination_Year']].head(10)
+```
 
 ## Download Census zip code shapefile (10 pt) 
 
