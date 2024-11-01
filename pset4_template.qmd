@@ -31,6 +31,8 @@ include-before-body:
 ```{python}
 import pandas as pd
 import altair as alt
+import geopandas as gpd
+
 import time
 
 import warnings 
@@ -80,8 +82,9 @@ def read_short_term_hospitals(year, pset_path):
     a. 
 ```{python}
 df_pos2016 = read_short_term_hospitals(2016, pset_path)
+df_pos2016
 ```
-Does it make sense?
+This number is too little.....
     b.
 
    
@@ -105,18 +108,58 @@ observation_by_year= df_pos2017_to_2019.groupby('year').size().reset_index(name=
 observation_by_year_plot = alt.Chart(observation_by_year).mark_bar(
     ).encode(
         alt.Y('year:O', title='Year'),
-        alt.X('count:Q', title='Number of Observations'),
+        alt.X('count:Q', title='Number of Observations')
     ).properties(
-        title='Number of observations im Provide-of-Service file between 2017 to 2019',
+        title='Providers of Service',
     )
-observation_by_year_plot 
+
+observation_label = observation_by_year_plot.mark_text(
+    align = 'left',
+    baseline = 'bottom',
+    dx = 5,
+    dy = 5,
+    fontSize = 10
+    ).encode(
+    text = 'count:Q'
+    )
+
+observation_by_year_plot + observation_label
 ```
-```
+
 
 
 4. 
     a.
-    b.
+```{python}
+# plot number of unique hospitals by year
+unique_hospital_by_year= df_pos2017_to_2019.groupby('year')['PRVDR_NUM'].nunique().reset_index(name='unique_hospital_count')
+
+
+unique_hospital_by_year_plot = alt.Chart(unique_hospital_by_year).mark_bar(
+    ).encode(
+        alt.Y('year:O', title='Year'),
+        alt.X('unique_hospital_count:Q', title='Number of unique hospitals')
+    ).properties(
+        title='Total unique hospitals by year',
+    )
+
+unique_label = unique_hospital_by_year_plot.mark_text(
+    align = 'left',
+    baseline = 'bottom',
+    dx = 5,
+    dy = 5,
+    fontSize = 10
+    ).encode(
+    text = 'unique_hospital_count:Q'
+    )
+unique_hospital_by_year_plot + unique_label
+```
+    b. 
+
+```{python}
+observation_by_year_plot + observation_label  | unique_hospital_by_year_plot + unique_label
+```
+From the two plots, we can see that the number of unique hospitals is exactly the same as the number of observations in each year. It tells us that a hospital only appears in the data once in a specific year, that is each row in each year represents a snapshot of a unique hospotal.
 
 ## Identify hospital closures in POS file (15 pts) (*)
 
@@ -131,6 +174,16 @@ observation_by_year_plot
 
 1. 
     a.
+
+
+
+| File Type | Information Type |
+| .dbf| Attribute information |
+| .prj | Coordinate Reference System (CRS) description |
+| .shp | Geometric or Spatial data (i.e., points, polygon) |
+| .shx | Positional index |
+| .xml |  |
+
     b. 
 2. 
 
