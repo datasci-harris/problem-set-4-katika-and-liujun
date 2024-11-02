@@ -273,7 +273,8 @@ count_zip = pd.concat([count_zip_2017, count_zip_2018], ignore_index=True)
     a. How many hospitals fit this definition of potentially being a merger/acquisition?
 ```{python}
 
-print(f"{count_zip.shape[0]} hospitals fit this definition of potentially being a merger/acquisition.")
+print(
+    f"{count_zip.shape[0]} hospitals fit this definition of potentially being a merger/acquisition.")
 ```
 
     b. After correcting for this, how many hospitals do you have left?
@@ -287,7 +288,8 @@ print(f"{closed_hospitals.shape[0]} hospitals were active in 2016 that were susp
     c. Sort this list of corrected hospital closures by name and report the first 10 rows.
 
 ```{python}
-closed_hospitals.sort_values('FAC_NAME')[['FAC_NAME','Termination_Year']].head(10)
+closed_hospitals.sort_values(
+    'FAC_NAME')[['FAC_NAME', 'Termination_Year']].head(10)
 ```
 
 ## Download Census zip code shapefile (10 pt) 
@@ -324,9 +326,6 @@ for dataset in os.listdir(zip_path):
 
 ```{python}
 import geopandas as gpd
-```
-
-```{python}
 shapefile_path = os.path.join(zip_path,'gz_2010_us_860_00_500k.shp')
 zip_shp = gpd.read_file(shapefile_path)
 
@@ -349,7 +348,7 @@ tx_hospitals_zip = tx_hospitals.groupby('ZIP_CD').size().reset_index(name='Numbe
 zip_tx = zip_tx.rename(columns={'NAME': 'ZIP_CD'})
 
 # Merge on ZIP_CD to get Texas ZIP codes with hospital counts
-tx_hospitals_merged = pd.merge(zip_tx, tx_hospitals_zip, on='ZIP_CD', how='left')
+tx_hospitals_merged = zip_tx.merge(tx_hospitals_zip, on='ZIP_CD', how='left')
 
 tx_hospitals_merged['Number of Hospitals'] = tx_hospitals_merged['Number of Hospitals'].fillna(0)
 
@@ -367,7 +366,7 @@ tx_hospitals_zip_plot = tx_hospitals_merged.plot(
     column = 'Number of Hospitals', 
     legend = True,
     linewidth=0.5).set_axis_off()
-plt.title('Number of Hospitals by ZIP Codes in Texas')
+plt.title('Number of Hospitals by ZIP Codes in Texas in 2016')
 plt.show()
 ```
 
@@ -476,6 +475,39 @@ print(f"Runtime: {end_time - start_time}")
 ## Effects of closures on access in Texas (15 pts)
 
 1. 
+
+```{python}
+closed_hospitals['ZIP_CD'] = closed_hospitals['ZIP_CD'].astype(int).astype(str).str.zfill(5)
+
+closed_hospitals_tx = closed_hospitals[closed_hospitals['ZIP_CD'].isin(zip_tx['ZIP_CD'])]
+
+
+closed_hospitals_tx_zip = closed_hospitals_tx.groupby('ZIP_CD').size().reset_index(name='Number of Hospital Closures')
+
+closed_hospitals_tx_zip_merged = closed_hospitals_tx_zip
+```
+
+# Merge on ZIP_CD to get Texas ZIP codes with hospital counts
+tx_hospitals_merged = pd.merge(zip_tx, tx_hospitals_zip, on='ZIP_CD', how='left')
+
+tx_hospitals_merged['Number of Hospitals'] = tx_hospitals_merged['Number of Hospitals'].fillna(0)
+
+
+```
+
+
+
+```{python}
+import matplotlib.pyplot as plt
+plt.figure(figsize=(10, 10))
+tx_hospitals_zip_plot = tx_hospitals_merged.plot(
+    column = 'Number of Hospitals', 
+    legend = True,
+    linewidth=0.5).set_axis_off()
+plt.title('Number of Hospitals by ZIP Codes in Texas')
+plt.show()
+```
+```
 2. 
 3. 
 4. 
