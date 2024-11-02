@@ -38,3 +38,21 @@ __pycache__/
 .idea/
 *.sublime-workspace
 *.sublime-projectx
+
+# Data files
+data/
+*.csv
+*.tsv
+*.json
+*.xlsx
+*.parquet
+
+# Quarto and Jupyter Notebook files
+*.qmd
+*.nb.html
+quarto_ipynb/
+*.ipynb
+
+# Python environment files
+*.envrc
+*.venv
