@@ -19,10 +19,31 @@ include-before-body:
 ---
 
 **PS4:** Due Sat Nov 2 at 5:00PM Central. Worth 100 points. 
-
-## Style Points (10 pts)
+We use (`*`) to indicate a problem that we think might be time consuming. 
+    
+## Style Points (10 pts) 
+Please refer to the minilesson on code style
+**[here](https://uchicago.zoom.us/rec/share/pG_wQ-pHTQrJTmqNn4rcrw5V194M2H2s-2jdy8oVhWHkd_yZt9o162IWurpA-fxU.BIQlSgZLRYctvzp-)**.
 
 ## Submission Steps (10 pts)
+1. This problem set is a paired problem set.
+2. Play paper, scissors, rock to determine who goes first. Call that person *Partner 1*.
+    - Partner 1 (name and cnet ID):
+    - Partner 2 (name and cnet ID):
+3. Partner 1 will accept the `ps4` and then share the link it creates with their partner. You can only share it with one partner so you will not be able to change it after your partner has accepted. 
+4. "This submission is our work alone and complies with the 30538 integrity policy." Add your initials to indicate your agreement: \*\*\_\_\*\* \*\*\_\_\*\*
+5. "I have uploaded the names of anyone else other than my partner and I worked with on the problem set **[here](https://docs.google.com/forms/d/185usrCREQaUbvAXpWhChkjghdGgmAZXA3lPWpXLLsts/edit)**"  (1 point)
+6. Late coins used this pset: \*\*\_\_\*\* Late coins left after submission: \*\*\_\_\*\*
+7. Knit your `ps4.qmd` to an PDF file to make `ps4.pdf`, 
+    * The PDF should not be more than 25 pages. Use `head()` and re-size figures when appropriate. 
+8. (Partner 1): push  `ps4.qmd` and `ps4.pdf` to your github repo.
+9. (Partner 1): submit `ps4.pdf` via Gradescope. Add your partner on Gradescope.
+10. (Partner 1): tag your submission in Gradescope
+
+**Important:** Repositories are for tracking code. **Do not commit the data or shapefiles to your repo.** The best way to do this is with `.gitignore`, which we have covered in class. If you do accidentally commit the data, Github has a [guide](https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github#removing-files-from-a-repositorys-history). The best course of action depends on whether you have pushed yet. This also means that both partners will have to download the initial raw data and any data cleaning code will need to be re-run on both partners' computers. 
+
+
+
 
 
 
@@ -35,7 +56,6 @@ import warnings
 warnings.filterwarnings('ignore')
 alt.renderers.enable("png")
 ```
-
 ## Download and explore the Provider of Services (POS) file (10 pts)
 
 1. 
@@ -73,6 +93,7 @@ def read_short_term_hospitals(year, pset_path):
     return df
 
 ```
+
 
 
     a. 
@@ -122,53 +143,6 @@ termination_years = {}
 # extract the active hospitals in 2016
 active_2016 = df[(df['year'] == 2016) & (df['PGM_TRMNTN_CD'] == 0)]
 
-active_df = df[df['PRVDR_NUM'].isin(active_2016['PRVDR_NUM'])]
-
-# group data by CMS code
-for hospital, group in active_df.groupby('PRVDR_NUM'):
-    # sort records by year for this hospital
-    group = group.sort_values('year')
-    
-    # set a default termination year as None
-    termination_year = None
-    
-    # check each year from 2017 to 2019 for termination
-    for year in [2017, 2018, 2019]:
-        # filter the data for the current year
-        yearly_data = group[group['year'] == year]
-        
-        # if no record for the hospital in this year, mark as terminated
-        if yearly_data.empty:
-            termination_year = year
-            break
-        # if the hospital is present but not active, mark as terminated
-        elif yearly_data['PGM_TRMNTN_CD'].values[0] != 0:
-            termination_year = year
-            break
-
-    # if a termination year was identified, store it in the dictionary
-    if termination_year:
-        termination_years[hospital] = termination_year
-
-# convert the termination years to a DataFrame
-terminate_year_df = pd.DataFrame(list(termination_years.items()), columns=['PRVDR_NUM', 'Termination_Year'])
-
-# adding ZIP code information for each hospital from original dataset
-closed_hospitals_zipcode = active_df[active_df['year'] == 2016][['PRVDR_NUM', 'FAC_NAME', 'ZIP_CD']].drop_duplicates('PRVDR_NUM')
-
-# combine termination years with ZIP code information
-closed_hospitals = terminate_year_df.merge(closed_hospitals_zipcode, on='PRVDR_NUM', how='left')
-```
-
-```{python}
-""" df = df_pos2017_to_2019.copy()
-
-# initialize a dictionary to store termination years
-termination_years = {}
-
-# extract the active hospitals in 2016
-active_2016 = df[(df['year'] == 2016) & (df['PGM_TRMNTN_CD'] == 0)]
-
 active_df = df[df['FAC_NAME'].isin(active_2016['FAC_NAME'])]
 
 # group data by hospital name
@@ -204,7 +178,7 @@ terminate_year_df = pd.DataFrame(list(termination_years.items()), columns=['FAC_
 closed_hospitals_zipcode = active_df[active_df['year'] == 2016][['FAC_NAME', 'ZIP_CD']].drop_duplicates('FAC_NAME')
 
 # combine termination years with ZIP code information
-closed_hospitals = terminate_year_df.merge(closed_hospitals_zipcode, on='FAC_NAME', how='left') """
+closed_hospitals = terminate_year_df.merge(closed_hospitals_zipcode, on='FAC_NAME', how='left')
 ```
 
 
@@ -261,44 +235,13 @@ closed_hospitals.sort_values('FAC_NAME')[['FAC_NAME','Termination_Year']].head(1
 ```
 
 3. Remove any suspected hospital closures that are in zip codes where the number of active hospitals does not decrease in the year after the suspected closure
-
-```{python}
-# count the active hospitals of each zip code every year
-
-active_counts = active_df.groupby(['year', 'ZIP_CD'])['PGM_TRMNTN_CD'].apply(lambda x: (x == 0).sum()).reset_index(name='active_count')
-
-zip_and_close_year = pd.DataFrame(closed_hospitals.groupby(['ZIP_CD', 'Termination_Year']).size()).reset_index()
-
-zip_with_merger = []
-
-for index, row in zip_and_close_year.iterrows():
-    zip = row['ZIP_CD']
-    year = row['Termination_Year']
-    if year == 2019:
-        continue
     
-    zip_data = active_counts[active_counts['ZIP_CD'] == zip]
-    count_this_year = zip_data[zip_data['year'] == year]['active_count']
-    count_next_year = zip_data[zip_data['year'] == (year + 1)]['active_count']
-
-    if not count_this_year.empty and not count_next_year.empty:
-        # Extract scalar values (there should be only one value per year now)
-        count_this_year = count_this_year.iloc[0]
-        count_next_year = count_next_year.iloc[0]
-
-        if count_this_year <= count_next_year:
-            zip_with_merger.append(zip)
-
-```
-
-
-
 ```{python}
-""" # extract all the zip codes of terminated hospitals in 2017 and check if the number decreased in 2018
+# extract all the zip codes of terminated hospitals in 2017 and check if the number decreased in 2018
 
 closed_zip_2017 = closed_hospitals[closed_hospitals['Termination_Year'] == 2017]['ZIP_CD']
 
-active_counts = active_df.groupby(['year', 'ZIP_CD'])['PGM_TRMNTN_CD'].apply(lambda x: (x == 0).sum()).reset_index(name='active_count')
+active_counts = df.groupby(['year', 'ZIP_CD'])['PGM_TRMNTN_CD'].apply(lambda x: (x == 0).sum()).reset_index(name='active_count')
 
 # filter for 2017 and 2018 only
 counts_2017_2018 = active_counts[active_counts['year'].isin([2017, 2018])]
@@ -307,11 +250,11 @@ counts_2017_2018 = counts_2017_2018.pivot(index='ZIP_CD', columns='year', values
 # filter for ZIP codes in closed_zip_2017 with less count in 2017 than 2018
 count_zip_2017 = counts_2017_2018[(counts_2017_2018['ZIP_CD'].isin(closed_zip_2017)) & (counts_2017_2018[2017] <= counts_2017_2018[2018])]
 
-count_zip_2017 """
+count_zip_2017
 ```
 
 ```{python}
-""" # repeat the step for 2018 and 2019
+# repeat the step for 2018 and 2019
 
 closed_zip_2018 = closed_hospitals[closed_hospitals['Termination_Year'] == 2018]['ZIP_CD']
 
@@ -320,23 +263,23 @@ counts_2018_2019 = active_counts[active_counts['year'].isin([2018, 2019])]
 counts_2018_2019 = counts_2018_2019 .pivot(index='ZIP_CD', columns='year', values='active_count').reset_index()
 
 # filter for ZIP codes in closed_zip_2017 with less count in 2017 than 2018
-count_zip_2018 = counts_2018_2019[(counts_2018_2019['ZIP_CD'].isin(closed_zip_2018)) & (counts_2018_2019[2018] <= counts_2018_2019[2019])]
+count_zip_2018 = counts_2018_2019[(counts_2018_2019['ZIP_CD'].isin(closed_zip_2018)) & (counts_2018_2019 [2018] <= counts_2018_2019[2019])]
 
 count_zip_2018
 
-count_zip = pd.concat([count_zip_2017, count_zip_2018], ignore_index=True) """
+count_zip = pd.concat([count_zip_2017, count_zip_2018], ignore_index=True)
 ```
 
     a. How many hospitals fit this definition of potentially being a merger/acquisition?
 ```{python}
-print(f"{len(zip_with_merger)} hospitals fit this definition of potentially being a merger/acquisition.")
+
+print(f"{count_zip.shape[0]} hospitals fit this definition of potentially being a merger/acquisition.")
 ```
 
     b. After correcting for this, how many hospitals do you have left?
-
 ```{python}
 # filter merger hospitials
-closed_hospitals = closed_hospitals[~closed_hospitals['ZIP_CD'].isin(zip_with_merger)]
+closed_hospitals = closed_hospitals[~closed_hospitals['ZIP_CD'].isin(count_zip['ZIP_CD'])]
 
 print(f"{closed_hospitals.shape[0]} hospitals were active in 2016 that were suspected to have closed by 2019")
 ```
@@ -466,7 +409,7 @@ print(f"Unique zip codes in zips_texas_borderstates_centroids: {zips_texas_borde
 
 I will do a inner merge on variables merging on ZIP_CD.
 ```{python}
-zip_2016 = pd.DataFrame(active_2016['ZIP_CD'].fillna(0).astype(int).astype(str).str.zfill(5).drop_duplicates())
+zip_2016 = pd.DataFrame(df_pos2016['ZIP_CD'].fillna(0).astype(int).astype(str).str.zfill(5).drop_duplicates())
 zip_2016.columns = ['ZIP_CD']
 zips_texas_borderstates_centroids['ZIP_CD'] = zips_texas_borderstates_centroids['ZIP_CD'].astype(str)
 
@@ -524,11 +467,9 @@ print(f"Runtime: {end_time - start_time}")
 ```
 
     c.
-    The unit is 'Degree'. One degree of latitude is approximately 69 miles, while one degree of longitude is approximately 54.6 miles. 
 
 5. 
     a.
-
     b.
     c.
     
