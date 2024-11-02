@@ -504,7 +504,7 @@ plt.show()
 #  Create a GeoDataFrame for the centroid of each zip code nationally
 
 zips_all_centroids = gpd.GeoDataFrame({
-    'ZIP_CD': zip_shp['NAME'],
+    'ZIP_CD': zip_shp['ZCTA5'],
     'centroid': zip_shp.geometry.centroid
 })
 
@@ -531,7 +531,8 @@ print(f"Unique zip codes in zips_texas_borderstates_centroids: {zips_texas_borde
 
 3. Create a subset of zips_texas_borderstates_centroids that contains only the zip codes with at least 1 hospital in 2016
 
-I will do a inner merge on variables merging on ZIP_CD.
+I will do a inner join merge on variables merging on ZIP_CD.
+
 ```{python}
 zip_2016 = pd.DataFrame(active_2016['ZIP_CD'].fillna(0).astype(int).astype(str).str.zfill(5).drop_duplicates())
 zip_2016.columns = ['ZIP_CD']
@@ -549,6 +550,48 @@ zips_withhospital_centroids.head()
 
 ```{python}
 import time
+from shapely.geometry import Point
+
+zips_texas_centroids = zips_texas_centroids.set_geometry('centroid')
+zips_withhospital_centroids = zips_withhospital_centroids.set_geometry('centroid')
+
+# subset the first ten row
+zips_texas_centroids_subset = zips_texas_centroids[:10]
+
+start_time = time.time()
+
+nearest_distances = []
+
+# loop over each row in the first 10 rows of zips_texas_centroids
+for _, row_tx in zips_texas_centroids_subset.iterrows():
+    point1 = row_tx['centroid']
+    nearest_distance = float('inf')  # Initialize to a large number
+    
+    # loop over each row in zips_withhospital_centroids
+    for _, row_all in zips_withhospital_centroids.iterrows():
+        point2 = row_all['centroid']
+        
+        # calculate distance
+        distance_new = point1.distance(point2)
+        
+        # update nearest distance if a closer point is found
+        if distance_new < nearest_distance:
+            nearest_distance = distance_new
+    
+    # append the nearest distance for the current row in zips_texas_centroids
+    nearest_distances.append(nearest_distance)
+
+# assign the calculated distances
+zips_texas_centroids_subset['nearest_distance'] = nearest_distances
+
+end_time = time.time()
+
+print(f"Runtime: {end_time - start_time}")
+
+```
+
+```{python}
+""" import time
 
 zips_texas_centroids = zips_texas_centroids.set_geometry('centroid')
 zips_withhospital_centroids = zips_withhospital_centroids.set_geometry('centroid')
@@ -564,18 +607,51 @@ join_first_10 = gpd.sjoin_nearest(
 
 end_time = time.time()
 
-print(f"Runtime: {end_time - start_time}")
+print(f"Runtime: {end_time - start_time}") """
 
 ```
 
-It takes around 0.03 seconds to join the 10 zip codes. As there are 1935 unique zip codes in zip_texas_centroids, the total would be 0.03*1935/10 = 5.805 seconds. In other words, we estimate the entire procedure will take around 5 - 6 seconds.
-
+It takes around 0.13 seconds to join the 10 zip codes. As there are 1935 unique zip codes in zip_texas_centroids, the total would be 0.13*1935/10 = 25 seconds. In other words, we estimate the entire procedure will take around 25 seconds.
 
     b. Doing the full join
 
 ```{python}
 
 start_time = time.time()
+
+nearest_distances = []
+
+# loop over each row in zips_texas_centroids
+for _, row_tx in zips_texas_centroids.iterrows():
+    point1 = row_tx['centroid']
+    nearest_distance = float('inf')  # initialize to a large number
+    
+    # loop over each row in zips_withhospital_centroids
+    for _, row_all in zips_withhospital_centroids.iterrows():
+        point2 = row_all['centroid']
+        
+        # calculate distance
+        distance_new = point1.distance(point2)
+        
+        # update nearest distance if a closer point is found
+        if distance_new < nearest_distance:
+            nearest_distance = distance_new
+    
+    # append the nearest distance for the current row in zips_texas_centroids
+    nearest_distances.append(nearest_distance)
+
+# assign the calculated distances
+zips_texas_centroids['nearest_distance'] = nearest_distances
+
+end_time = time.time()
+
+print(f"Runtime: {end_time - start_time}")
+
+```
+
+```{python}
+
+""" start_time = time.time()
 
 join_all = gpd.sjoin_nearest(
     zips_texas_centroids,  #left df
@@ -586,19 +662,64 @@ join_all = gpd.sjoin_nearest(
 
 end_time = time.time()
 
-print(f"Runtime: {end_time - start_time}")
+print(f"Runtime: {end_time - start_time}") """
 
 ```
 
     c.
-    The unit is 'Degree'. One degree of latitude is approximately 69 miles, while one degree of longitude is approximately 54.6 miles. 
+    The unit is 'Degree'. One degree of latitude is approximately 69 miles, while one degree of longitude is approximately 54.6 miles. In this case, we will neglect longitude and multiply the degree by 69 to convert it to miles.
 
-5. 
-    a.
+```{python}
+# convert the degree unit to miles
+zips_texas_centroids['nearest_distance'] = zips_texas_centroids['nearest_distance'] * 69
+```
 
-    b.
-    c.
-    
+5. Calculate the average distance to the nearest hospital for each zip code in Texas
+
+    a. What unit is this in?
+
+    The unit is 'Miles'.
+
+    b. Report the average distance in miles
+
+```{python}
+
+zips_texas_centroids['nearest_distance'].mean()
+```   
+
+The average distance to the nearest hospital for each zip code in Texas is 14.56 miles, which makes sense.
+
+    c. Map the value for each zip code
+
+```{python}
+import matplotlib.pyplot as plt
+
+fig, ax = plt.subplots()
+
+# Plotting the polygons from zip_tx
+zip_tx.plot(ax=ax, color=None, edgecolor="grey", alpha=0.5, label="Dense")
+
+# Plotting the centroids with a color gradient based on 'nearest_distance'
+# `cmap` sets the color map (e.g., 'viridis', 'coolwarm', 'plasma', etc.)
+zips_texas_centroids.plot(
+    ax=ax,
+    column='nearest_distance',
+    cmap='YlGnBu',  # Choose a color map that suits your visualization
+    alpha=0.8,
+    markersize=20, 
+    legend=True,  # Show legend for color scale
+    label="Centroids"
+)
+
+# Remove axis for a cleaner look
+ax.set_axis_off()
+
+# Show plot
+plt.show()
+```   
+
+Most areas on the east side of Texas have nearby hospitals, while some areas on the west side near the border have a much greater distance to the nearest hospital.
+
 
 ## Effects of closures on access in Texas (15 pts)
 
@@ -754,3 +875,7 @@ plt.show()
 
 
 ## Reflecting on the exercise (10 pts) 
+
+1. The “first-pass” method we’re using to address incorrectly identified closures in the data is imperfect. Can you think of some potential issues that could arise still and ways to do a better job at confirming hospital closures?
+
+There are some deficiencies in the method. In Section 2, when attempting to identify ‘false closures,’ we removed zip codes where the number of active hospitals in the closure year did not decrease in subsequent years. However, this approach only partially addresses the possibility of mergers. Since the count of active hospitals in the closure year does not include the hospitals that closed, the number may remain stable in the following year even if no merger or acquisition occurred. This means we may have mistakenly excluded some zip codes with actual closures. To improve, we could consider to compare the number of active hospitals in the year before the closure to the year after the closure. This would help us identify potential mergers more accurately, as it accounts for changes in hospital availability over a broader period. 
