@@ -41,25 +41,253 @@ Please refer to the minilesson on code style
 
 **Important:** Repositories are for tracking code. **Do not commit the data or shapefiles to your repo.** The best way to do this is with `.gitignore`, which we have covered in class. If you do accidentally commit the data, Github has a [guide](https://docs.github.com/en/repositories/working-with-files/managing-large-files/about-large-files-on-github#removing-files-from-a-repositorys-history). The best course of action depends on whether you have pushed yet. This also means that both partners will have to download the initial raw data and any data cleaning code will need to be re-run on both partners' computers. 
 
+
+
+
+
+
+```{python}
+import pandas as pd
+import altair as alt
+import time
+
+import warnings 
+warnings.filterwarnings('ignore')
+alt.renderers.enable("png")
+```
 ## Download and explore the Provider of Services (POS) file (10 pts)
 
 1. 
+```
+PRVDR_CTGRY_SBTYP_CD = Sub-type of Provider
+PRVDR_CTGRY_CD = Provider Category Code
+PRVDR_NUM = CMS Certification Number
+PGM_TRMNTN_CD = Termination Code
+TRMNTN_EXPRTN_DT = Date the provider was terminated 
+FAC_NAME = Facility Name
+ZIP_CD = Zip code
+STATE_CD = State Abbreviation
+```
 2. 
-    a.
-    b.
-3. 
+
+```{python}
+# set path and read in the pos2016.csv file
+pset_path = '/Users/aa/Documents/GitHub/problem-set-4-katika-and-liujun/data/'
+
+# create a function to load, filter, and count number of short-term hospitals
+def read_short_term_hospitals(year, pset_path):
+    """
+    read the provider-of-service data for a given year, filters for short-term hospitals,
+    and returns the filtered DataFrame.
+    
+    Parameters:
+        year (int): The year of the data (e.g., 2017).
+        pset_path (str): The path to the directory containing the CSV files.
+
+    """
+    file_path = os.path.join(pset_path, f'pos{year}.csv')
+    df = pd.read_csv(file_path, encoding='latin1')
+    df = df[(df['PRVDR_CTGRY_CD'] == 1) & (df['PRVDR_CTGRY_SBTYP_CD'] == 1)]
+    print(f'There are {df.shape[0]} short-term hospitals reported in {year} data')
+    return df
+
+```
+
+
+
+    a. 
+```{python}
+df_pos2016 = read_short_term_hospitals(2016, pset_path)
+
+# repeat the steps for each year
+df_pos2017 = read_short_term_hospitals(2017, pset_path)
+df_pos2018 = read_short_term_hospitals(2018, pset_path)
+df_pos2019 = read_short_term_hospitals(2019, pset_path)
+
+# append all the pos data
+df_pos2017_to_2019 = pd.concat([df_pos2016.assign(year = 2016), df_pos2017.assign(year = 2017), df_pos2018.assign(year = 2018), df_pos2019.assign(year = 2019)], ignore_index=True)
+
+```
+
+```{python}
+# plot number of observations by year
+observation_by_year= df_pos2017_to_2019.groupby('year').size().reset_index(name='count')
+
+observation_by_year_plot = alt.Chart(observation_by_year).mark_bar(
+    ).encode(
+        alt.Y('year:O', title='Year'),
+        alt.X('count:Q', title='Number of Observations'),
+    ).properties(
+        title='Number of observations im Provide-of-Service file between 2017 to 2019',
+    )
+observation_by_year_plot 
+
+```
+
+
 4. 
     a.
     b.
 
 ## Identify hospital closures in POS file (15 pts) (*)
 
-1. 
-2. 
-3. 
-    a.
-    b.
-    c.
+1. Create a list of all hospitals that were active in 2016 that were suspected to have closed by 2019
+
+```{python}
+df = df_pos2017_to_2019.copy()
+
+# initialize a dictionary to store termination years
+termination_years = {}
+
+# extract the active hospitals in 2016
+active_2016 = df[(df['year'] == 2016) & (df['PGM_TRMNTN_CD'] == 0)]
+
+active_df = df[df['FAC_NAME'].isin(active_2016['FAC_NAME'])]
+
+# group data by hospital name
+for hospital, group in active_df.groupby('FAC_NAME'):
+    # sort records by year for this hospital
+    group = group.sort_values('year')
+    
+    # set a default termination year as None
+    termination_year = None
+    
+    # check each year from 2017 to 2019 for termination
+    for year in [2017, 2018, 2019]:
+        # filter the data for the current year
+        yearly_data = group[group['year'] == year]
+        
+        # if no record for the hospital in this year, mark as terminated
+        if yearly_data.empty:
+            termination_year = year
+            break
+        # if the hospital is present but not active, mark as terminated
+        elif yearly_data['PGM_TRMNTN_CD'].values[0] != 0:
+            termination_year = year
+            break
+
+    # if a termination year was identified, store it in the dictionary
+    if termination_year:
+        termination_years[hospital] = termination_year
+
+# convert the termination years to a DataFrame
+terminate_year_df = pd.DataFrame(list(termination_years.items()), columns=['FAC_NAME', 'Termination_Year'])
+
+# adding ZIP code information for each hospital from original dataset
+closed_hospitals_zipcode = active_df[active_df['year'] == 2016][['FAC_NAME', 'ZIP_CD']].drop_duplicates('FAC_NAME')
+
+# combine termination years with ZIP code information
+closed_hospitals = terminate_year_df.merge(closed_hospitals_zipcode, on='FAC_NAME', how='left')
+```
+
+
+```{python}
+""" df = df_pos2017_to_2019.copy()
+
+# extract the active hospitals in 2016
+active_2016 = df[(df['year'] == 2016) & (df['PGM_TRMNTN_CD'] == 0)]
+
+# extract the active hospitals till 2019
+active_2019_hospitals = []
+
+for hospital, group in df.groupby('FAC_NAME'):
+    # check if the hospital is active from 2016 to 2019
+    if all(((group['year'] == year) & (group['PGM_TRMNTN_CD'] == 0)).any() for year in [2016, 2017, 2018, 2019]):
+        active_2019_hospitals.append(hospital)
+
+# closed hospital name
+closed_hospitals_name = set(active_2016['FAC_NAME']) - set(active_2019_hospitals)
+
+closed_hospitals_all_year = df[df['FAC_NAME'].isin(closed_hospitals_name)]
+
+# Define the function to determine the termination year for a hospital
+def get_termination_year(subdf):
+    # If there is a termination code other than 0, return the earliest year
+    if not subdf[subdf['PGM_TRMNTN_CD'] != 0].empty:
+        return subdf[subdf['PGM_TRMNTN_CD'] != 0]['year'].min()
+    else:
+        # Otherwise, assume the hospital was active until the last year + 1
+        return subdf['year'].max() + 1
+
+# apply the function to each hospital group and convert to a dictionary
+terminate_year = closed_hospitals_all_year.groupby('FAC_NAME').apply(get_termination_year).to_dict()
+
+terminate_year = pd.DataFrame(list(terminate_year.items()), columns=['FAC_NAME', 'Termination_Year'])
+
+# add zipcode
+closed_hospitals_zipcode = active_2016[active_2016['FAC_NAME'].isin(closed_hospitals_name)][['FAC_NAME', 'ZIP_CD']]
+
+# combine the two dataframe
+
+closed_hospitals = terminate_year.merge(closed_hospitals_zipcode)
+
+closed_hospitals = closed_hospitals.drop_duplicates('FAC_NAME') """
+```
+
+```{python}
+print(f"{closed_hospitals.shape[0]} hospitals were active in 2016 that were suspected to have closed by 2019")
+```
+
+2. Sort this list of hospitals by name and report the names and year of suspected closure for the first 10 rows
+```{python}
+closed_hospitals.sort_values('FAC_NAME')[['FAC_NAME','Termination_Year']].head(10)
+```
+
+3. Remove any suspected hospital closures that are in zip codes where the number of active hospitals does not decrease in the year after the suspected closure
+    
+```{python}
+# extract all the zip codes of terminated hospitals in 2017 and check if the number decreased in 2018
+
+closed_zip_2017 = closed_hospitals[closed_hospitals['Termination_Year'] == 2017]['ZIP_CD']
+
+active_counts = df.groupby(['year', 'ZIP_CD'])['PGM_TRMNTN_CD'].apply(lambda x: (x == 0).sum()).reset_index(name='active_count')
+
+# filter for 2017 and 2018 only
+counts_2017_2018 = active_counts[active_counts['year'].isin([2017, 2018])]
+counts_2017_2018 = counts_2017_2018.pivot(index='ZIP_CD', columns='year', values='active_count').reset_index()
+
+# filter for ZIP codes in closed_zip_2017 with less count in 2017 than 2018
+count_zip_2017 = counts_2017_2018[(counts_2017_2018['ZIP_CD'].isin(closed_zip_2017)) & (counts_2017_2018[2017] <= counts_2017_2018[2018])]
+
+count_zip_2017
+```
+
+```{python}
+# repeat the step for 2018 and 2019
+
+closed_zip_2018 = closed_hospitals[closed_hospitals['Termination_Year'] == 2018]['ZIP_CD']
+
+# filter for 2018 and 2019 only
+counts_2018_2019 = active_counts[active_counts['year'].isin([2018, 2019])]
+counts_2018_2019 = counts_2018_2019 .pivot(index='ZIP_CD', columns='year', values='active_count').reset_index()
+
+# filter for ZIP codes in closed_zip_2017 with less count in 2017 than 2018
+count_zip_2018 = counts_2018_2019[(counts_2018_2019['ZIP_CD'].isin(closed_zip_2018)) & (counts_2018_2019 [2018] <= counts_2018_2019[2019])]
+
+count_zip_2018
+
+count_zip = pd.concat([count_zip_2017, count_zip_2018], ignore_index=True)
+```
+
+    a. How many hospitals fit this definition of potentially being a merger/acquisition?
+```{python}
+
+print(f"{count_zip.shape[0]} hospitals fit this definition of potentially being a merger/acquisition.")
+```
+
+    b. After correcting for this, how many hospitals do you have left?
+```{python}
+# filter merger hospitials
+closed_hospitals = closed_hospitals[~closed_hospitals['ZIP_CD'].isin(count_zip['ZIP_CD'])]
+
+print(f"{closed_hospitals.shape[0]} hospitals were active in 2016 that were suspected to have closed by 2019")
+```
+
+    c. Sort this list of corrected hospital closures by name and report the first 10 rows.
+
+```{python}
+closed_hospitals.sort_values('FAC_NAME')[['FAC_NAME','Termination_Year']].head(10)
+```
 
 ## Download Census zip code shapefile (10 pt) 
 
@@ -68,14 +296,113 @@ Please refer to the minilesson on code style
     b. 
 2. 
 
+```{python}
+import geopandas as gpd
+
+filepath = "/Users/aa/Documents/Q4/Python/shp"
+zip_shp = gpd.read_file(filepath)
+```
+
+```{python}
+# Texas zip codes start with 733, and 750 - 799
+zip_tx = zip_shp[zip_shp['NAME'].str.startswith(('733', '75', '76', '77', '78', '79'))]
+```
+
 ## Calculate zip code’s distance to the nearest hospital (20 pts) (*)
 
 1. 
+```{python}
+#  Create a GeoDataFrame for the centroid of each zip code nationally
+
+zips_all_centroids = gpd.GeoDataFrame({
+    'ZIP_CD': zip_shp['NAME'],
+    'centroid': zip_shp.geometry.centroid
+})
+
+
+zips_all_centroids.shape
+```
+
+The dimensions of the GeoDataFrame include 33120 rows and 2 columns. The first column 'ZIP_CD' is the zip codes nationally and the second column 'centroid' is the position of all the points in the zip code polygons.
+
 2. 
-3. 
+```{python}
+# Texas zip codes start with 733, and 750 - 799
+zips_texas_centroids = zips_all_centroids[zips_all_centroids['ZIP_CD'].str.startswith(('733', '75', '76', '77', '78', '79'))]
+
+# the border states include NM, OK, AR, LA
+# zip codes start with 700 - 749, 870 - 884
+
+zips_texas_borderstates_centroids = zips_all_centroids[zips_all_centroids['ZIP_CD'].str.startswith(('7', '87', '88'))]
+
+print(f"Unique zip codes in zip_texas_centroids: {zips_texas_centroids['ZIP_CD'].nunique()}")
+print(f"Unique zip codes in zips_texas_borderstates_centroids: {zips_texas_borderstates_centroids['ZIP_CD'].nunique()}")
+```
+
+
+3. Create a subset of zips_texas_borderstates_centroids that contains only the zip codes with at least 1 hospital in 2016
+
+I will do a inner merge on variables merging on ZIP_CD.
+```{python}
+zip_2016 = pd.DataFrame(df_pos2016['ZIP_CD'].fillna(0).astype(int).astype(str).str.zfill(5).drop_duplicates())
+zip_2016.columns = ['ZIP_CD']
+zips_texas_borderstates_centroids['ZIP_CD'] = zips_texas_borderstates_centroids['ZIP_CD'].astype(str)
+
+zips_withhospital_centroids = zips_texas_borderstates_centroids.merge(zip_2016, on = 'ZIP_CD')
+```
+
+```{python}
+zips_withhospital_centroids.head()
+```
+
 4. 
-    a.
-    b.
+    a. Try the join with 10 zip codes
+
+```{python}
+import time
+
+zips_texas_centroids = zips_texas_centroids.set_geometry('centroid')
+zips_withhospital_centroids = zips_withhospital_centroids.set_geometry('centroid')
+
+start_time = time.time()
+
+join_first_10 = gpd.sjoin_nearest(
+    zips_texas_centroids[:10],  #left df
+    zips_withhospital_centroids, #right df
+    how='left', 
+    distance_col="distance"
+)
+
+end_time = time.time()
+
+print(f"Runtime: {end_time - start_time}")
+
+```
+
+It takes around 0.03 seconds to join the 10 zip codes. As there are 1935 unique zip codes in zip_texas_centroids, the total would be 0.03*1935/10 = 5.805 seconds. In other words, we estimate the entire procedure will take around 5 - 6 seconds.
+
+
+    b. Doing the full join
+
+```{python}
+
+start_time = time.time()
+
+join_all = gpd.sjoin_nearest(
+    zips_texas_centroids,  #left df
+    zips_withhospital_centroids, #right df
+    how='left', 
+    distance_col="distance"
+)
+
+end_time = time.time()
+
+print(f"Runtime: {end_time - start_time}")
+
+```
+
+    c.
+
 5. 
     a.
     b.
