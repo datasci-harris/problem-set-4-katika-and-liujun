@@ -1,5 +1,5 @@
 ---
-title: "Your Title"
+title: "Problem Set 4"
 format: 
   pdf:
     keep-tex: true
@@ -27,12 +27,12 @@ Please refer to the minilesson on code style
 ## Submission Steps (10 pts)
 1. This problem set is a paired problem set.
 2. Play paper, scissors, rock to determine who goes first. Call that person *Partner 1*.
-    - Partner 1 (name and cnet ID):
-    - Partner 2 (name and cnet ID):
+    - Partner 1 (name and cnet ID): Katika Klinkaew, katikak
+    - Partner 2 (name and cnet ID): Liujun Hua, liujunh
 3. Partner 1 will accept the `ps4` and then share the link it creates with their partner. You can only share it with one partner so you will not be able to change it after your partner has accepted. 
-4. "This submission is our work alone and complies with the 30538 integrity policy." Add your initials to indicate your agreement: \*\*\_\_\*\* \*\*\_\_\*\*
+4. "This submission is our work alone and complies with the 30538 integrity policy." Add your initials to indicate your agreement: \*\*\*KK\*\* \*\*\*LH\*\*
 5. "I have uploaded the names of anyone else other than my partner and I worked with on the problem set **[here](https://docs.google.com/forms/d/185usrCREQaUbvAXpWhChkjghdGgmAZXA3lPWpXLLsts/edit)**"  (1 point)
-6. Late coins used this pset: \*\*\_\_\*\* Late coins left after submission: \*\*\_\_\*\*
+6. Late coins used this pset: \*\*\*0\*\* Late coins left after submission: \*\*\_\_\*\*
 7. Knit your `ps4.qmd` to an PDF file to make `ps4.pdf`, 
     * The PDF should not be more than 25 pages. Use `head()` and re-size figures when appropriate. 
 8. (Partner 1): push  `ps4.qmd` and `ps4.pdf` to your github repo.
@@ -163,10 +163,6 @@ unique_hospital_by_year_plot + unique_label
 ```
 
     b. 
-```{python}
-observation_by_year_plot + observation_label  | unique_hospital_by_year_plot + unique_label
-```
-
 From the two plots, we can see that the number of unique hospitals is exactly the same as the number of observations in each year. It tells us that a hospital only appears in the data once in a specific year, that is each row in each year represents a snapshot of a unique hospital.
 
 ## Identify hospital closures in POS file (15 pts) (*)
