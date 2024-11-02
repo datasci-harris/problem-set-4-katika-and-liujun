@@ -539,23 +539,6 @@ print(f"Runtime: {end_time - start_time}")
 
 ```
 
-```{python}
-
-""" start_time = time.time()
-
-join_all = gpd.sjoin_nearest(
-    zips_texas_centroids,  #left df
-    zips_withhospital_centroids, #right df
-    how='left', 
-    distance_col="distance"
-)
-
-end_time = time.time()
-
-print(f"Runtime: {end_time - start_time}") """
-
-```
-
     c.
     The unit is 'Degree'. One degree of latitude is approximately 69 miles, while one degree of longitude is approximately 54.6 miles. In this case, we will neglect longitude and multiply the degree by 69 to convert it to miles.
 
