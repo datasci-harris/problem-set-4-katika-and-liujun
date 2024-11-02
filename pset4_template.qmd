@@ -15,6 +15,7 @@ include-before-body:
       breaksymbolleft={},
       breaklines
     }
+
 ---
 
 **PS4:** Due Sat Nov 2 at 5:00PM Central. Worth 100 points. 
@@ -72,7 +73,7 @@ STATE_CD = State Abbreviation
 
 ```{python}
 # set path and read in the pos2016.csv file
-pset_path = '/Users/aa/Documents/GitHub/problem-set-4-katika-and-liujun/data/'
+pset_path = '/Users/katikaklinkaew/Documents/GitHub/problem-set-4-katika-and-liujun/data/'
 
 # create a function to load, filter, and count number of short-term hospitals
 def read_short_term_hospitals(year, pset_path):
@@ -105,13 +106,13 @@ df_pos2018 = read_short_term_hospitals(2018, pset_path)
 df_pos2019 = read_short_term_hospitals(2019, pset_path)
 
 # append all the pos data
-df_pos2017_to_2019 = pd.concat([df_pos2016.assign(year = 2016), df_pos2017.assign(year = 2017), df_pos2018.assign(year = 2018), df_pos2019.assign(year = 2019)], ignore_index=True)
+df_pos2016_to_2019 = pd.concat([df_pos2016.assign(year = 2016), df_pos2017.assign(year = 2017), df_pos2018.assign(year = 2018), df_pos2019.assign(year = 2019)], ignore_index=True)
 
 ```
 
 ```{python}
 # plot number of observations by year
-observation_by_year= df_pos2017_to_2019.groupby('year').size().reset_index(name='count')
+observation_by_year= df_pos2016_to_2019.groupby('year').size().reset_index(name='count')
 
 observation_by_year_plot = alt.Chart(observation_by_year).mark_bar(
     ).encode(
@@ -134,7 +135,7 @@ observation_by_year_plot
 1. Create a list of all hospitals that were active in 2016 that were suspected to have closed by 2019
 
 ```{python}
-df = df_pos2017_to_2019.copy()
+df = df_pos2016_to_2019.copy()
 
 # initialize a dictionary to store termination years
 termination_years = {}
@@ -292,21 +293,85 @@ closed_hospitals.sort_values('FAC_NAME')[['FAC_NAME','Termination_Year']].head(1
 ## Download Census zip code shapefile (10 pt) 
 
 1. 
-    a.
+  a.
+| File Type | Information Type |
+| .dbf| Attribute information |
+| .prj | Coordinate Reference System (CRS) description |
+| .shp | Geometric or Spatial data (i.e., points, polygon) |
+| .shx | Positional index for looking up geometries |
+| .xml | Metadata about the dataset including descriptions, purpose, agreement of use etc. |
+
     b. 
+```{python}
+zip_path = '/Users/katikaklinkaew/Documents/data/gz_2010_us_860_00_500k'
+
+# Print the size of each file in the folder
+for dataset in os.listdir(zip_path):
+    file_path = os.path.join(zip_path, dataset)
+    size = os.path.getsize(file_path)
+    if size < 1024:
+        size_str = f"{size:.2f} Bytes"
+    elif size < 1024 ** 2:
+        size_str = f"{size/1024:.2f} KB"
+    else:
+        size_str = f"{size/(1024 ** 2):.2f} MB"
+
+    print(f"{dataset}: {size_str}")
+
+```
+   
 2. 
 
 ```{python}
 import geopandas as gpd
-
-filepath = "/Users/aa/Documents/Q4/Python/shp"
-zip_shp = gpd.read_file(filepath)
 ```
+
+```{python}
+shapefile_path = os.path.join(zip_path,'gz_2010_us_860_00_500k.shp')
+zip_shp = gpd.read_file(shapefile_path)
+
+```
+
+
 
 ```{python}
 # Texas zip codes start with 733, and 750 - 799
 zip_tx = zip_shp[zip_shp['NAME'].str.startswith(('733', '75', '76', '77', '78', '79'))]
+
+active_2016['ZIP_CD'] = active_2016['ZIP_CD'].astype(int).astype(str).str.zfill(5)
+zip_tx['NAME'] = zip_tx['NAME'].astype(str).str.zfill(5)
+
+tx_hospitals = active_2016[active_2016['ZIP_CD'].isin(zip_tx['NAME'])]
+
+tx_hospitals_zip = tx_hospitals.groupby('ZIP_CD').size().reset_index(name='Number of Hospitals')
+
+
+zip_tx = zip_tx.rename(columns={'NAME': 'ZIP_CD'})
+
+# Merge on ZIP_CD to get Texas ZIP codes with hospital counts
+tx_hospitals_merged = pd.merge(zip_tx, tx_hospitals_zip, on='ZIP_CD', how='left')
+
+tx_hospitals_merged['Number of Hospitals'] = tx_hospitals_merged['Number of Hospitals'].fillna(0)
+
+
 ```
+
+```{python}
+tx_hospitals_merged[tx_hospitals_merged['Number of Hospitals'] ==tx_hospitals_merged['Number of Hospitals'].max()]
+```
+
+```{python}
+import matplotlib.pyplot as plt
+plt.figure(figsize=(10, 10))
+tx_hospitals_zip_plot = tx_hospitals_merged.plot(
+    column = 'Number of Hospitals', 
+    legend = True,
+    linewidth=0.5).set_axis_off()
+plt.title('Number of Hospitals by ZIP Codes in Texas')
+plt.show()
+```
+
+
 
 ## Calculate zip code’s distance to the nearest hospital (20 pts) (*)
 
