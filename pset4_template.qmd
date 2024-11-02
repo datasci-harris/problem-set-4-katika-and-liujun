@@ -500,26 +500,6 @@ print(f"Runtime: {end_time - start_time}")
 
 ```
 
-```{python}
-""" import time
-
-zips_texas_centroids = zips_texas_centroids.set_geometry('centroid')
-zips_withhospital_centroids = zips_withhospital_centroids.set_geometry('centroid')
-
-start_time = time.time()
-
-join_first_10 = gpd.sjoin_nearest(
-    zips_texas_centroids[:10],  #left df
-    zips_withhospital_centroids, #right df
-    how='left', 
-    distance_col="distance"
-)
-
-end_time = time.time()
-
-print(f"Runtime: {end_time - start_time}") """
-
-```
 
 It takes around 0.13 seconds to join the 10 zip codes. As there are 1935 unique zip codes in zip_texas_centroids, the total would be 0.13*1935/10 = 25 seconds. In other words, we estimate the entire procedure will take around 25 seconds.
 
@@ -789,3 +769,5 @@ plt.show()
 1. The “first-pass” method we’re using to address incorrectly identified closures in the data is imperfect. Can you think of some potential issues that could arise still and ways to do a better job at confirming hospital closures?
 
 There are some deficiencies in the method. In Section 2, when attempting to identify ‘false closures,’ we removed zip codes where the number of active hospitals in the closure year did not decrease in subsequent years. However, this approach only partially addresses the possibility of mergers. Since the count of active hospitals in the closure year does not include the hospitals that closed, the number may remain stable in the following year even if no merger or acquisition occurred. This means we may have mistakenly excluded some zip codes with actual closures. To improve, we could consider to compare the number of active hospitals in the year before the closure to the year after the closure. This would help us identify potential mergers more accurately, as it accounts for changes in hospital availability over a broader period. 
+
+2. 
